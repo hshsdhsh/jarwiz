@@ -1,3 +1,9 @@
 flask
 flask-cors
 requests
+
+# Voice assistant (voice.py)
+SpeechRecognition
+pyttsx3
+sounddevice
+# pyaudio  ← установи вручную если нужно: https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
