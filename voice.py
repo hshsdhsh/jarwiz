@@ -198,17 +198,58 @@ def execute_action(response: str) -> str:
 
 # ─── Audio Recording (no PyAudio!) ────────────────────────────────────────────
 
-def record_to_file(filename: str, duration: float, fs: int = 16000):
-    """Records audio from microphone and saves to a WAV file using sounddevice"""
+def record_to_file(filename: str, duration: float, fs: int = 16000, dynamic_silence: bool = True):
+    """Records audio from microphone and saves to a WAV file.
+    If dynamic_silence is True, stops automatically when user finishes speaking.
+    """
     try:
-        recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
-        sd.wait()  # Wait for recording to finish
-        
+        # If it's the quick wake word check, record fixed short duration
+        if not dynamic_silence or duration < 3.0:
+            recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
+            sd.wait()
+            audio_data = recording.tobytes()
+        else:
+            # Dynamic recording (VAD)
+            chunk_duration = 0.2
+            chunk_samples = int(chunk_duration * fs)
+            chunks = []
+            
+            silence_threshold = 500  # Default threshold for volume
+            silence_limit = 1.0     # Stop after 1 second of silence
+            
+            silence_start = None
+            start_time = time.time()
+            
+            # Open stream
+            with sd.InputStream(samplerate=fs, channels=1, dtype='int16') as stream:
+                while True:
+                    data, overflowed = stream.read(chunk_samples)
+                    chunks.append(data)
+                    
+                    # Calculate volume (max amplitude)
+                    volume = np.max(np.abs(data))
+                    
+                    # Safety stop at max duration
+                    if time.time() - start_time > duration:
+                        break
+                        
+                    # Check silence
+                    if volume < silence_threshold:
+                        if silence_start is None:
+                            silence_start = time.time()
+                        elif time.time() - silence_start > silence_limit:
+                            break
+                    else:
+                        silence_start = None
+            
+            recording = np.concatenate(chunks, axis=0)
+            audio_data = recording.tobytes()
+
         with wave.open(filename, 'wb') as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2) # 16-bit is 2 bytes
             wf.setframerate(fs)
-            wf.writeframes(recording.tobytes())
+            wf.writeframes(audio_data)
     except Exception as e:
         print(f"[Sounddevice] Ошибка записи: {e}")
 
