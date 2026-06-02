@@ -92,17 +92,32 @@ SYSTEM_PROMPT = """Ты JarWiz — голосовой AI-ассистент на
 3. Говори естественно, как человек
 4. Отвечай на том же языке, на котором говорит пользователь
 
-Когда пользователь просит открыть приложение или сайт — ответь ТОЛЬКО так:
-ACTION:OPEN:название
+Когда пользователь просит совершить действие, ответь ТОЛЬКО специальной командой:
 
-Когда просит найти что-то в интернете — ответь ТОЛЬКО так:
-ACTION:SEARCH:запрос
+Для сайтов и приложений:
+- Открыть приложение или сайт: ACTION:OPEN:название (например: "открой хром" -> ACTION:OPEN:chrome)
+- Поиск в Google: ACTION:SEARCH:запрос (например: "найди погоду в Париже" -> ACTION:SEARCH:погода в Париже)
 
-Примеры команд:
-- "открой хром" → ACTION:OPEN:chrome
-- "открой ютуб" → ACTION:OPEN:https://youtube.com
-- "найди рецепт борща" → ACTION:SEARCH:рецепт борща
-- "открой калькулятор" → ACTION:OPEN:calc
+Для управления системой и браузером:
+- Закрыть окно: ACTION:CLOSE_WINDOW
+- Свернуть все окна: ACTION:MINIMIZE_ALL
+- Громче звук: ACTION:VOLUME_UP
+- Тише звук: ACTION:VOLUME_DOWN
+- Выключить/включить звук (мутирование): ACTION:MUTE
+- Листать/прокрутить вниз: ACTION:SCROLL_DOWN
+- Листать/прокрутить вверх: ACTION:SCROLL_UP
+- Закрыть текущую вкладку в браузере: ACTION:CLOSE_TAB
+- Открыть новую вкладку в браузере: ACTION:NEW_TAB
+- Вернуться назад (в браузере): ACTION:BACK
+- Заблокировать компьютер/экран: ACTION:LOCK_SCREEN
+
+Примеры:
+- "закрой это окно" -> ACTION:CLOSE_WINDOW
+- "сделай потише" -> ACTION:VOLUME_DOWN
+- "закрой вкладку" -> ACTION:CLOSE_TAB
+- "прокрути страницу ниже" -> ACTION:SCROLL_DOWN
+- "сверни всё" -> ACTION:MINIMIZE_ALL
+- "заблокируй комп" -> ACTION:LOCK_SCREEN
 """
 
 history = []
@@ -181,6 +196,30 @@ def clean_speech_target(target: str) -> str:
         return domain
     return target
 
+def press_key(vk_code: int):
+    """Simulates a key press (down and up) using Win32 API"""
+    try:
+        import ctypes
+        ctypes.windll.user32.keybd_event(vk_code, 0, 0, 0)
+        time.sleep(0.05)
+        ctypes.windll.user32.keybd_event(vk_code, 0, 2, 0)
+    except Exception as e:
+        print(f"[Keybd Error] {e}")
+
+def press_hotkey(mod_code: int, vk_code: int):
+    """Simulates a modifier + key combination (e.g. Ctrl+W, Alt+F4)"""
+    try:
+        import ctypes
+        ctypes.windll.user32.keybd_event(mod_code, 0, 0, 0)
+        time.sleep(0.05)
+        ctypes.windll.user32.keybd_event(vk_code, 0, 0, 0)
+        time.sleep(0.05)
+        ctypes.windll.user32.keybd_event(vk_code, 0, 2, 0)
+        time.sleep(0.05)
+        ctypes.windll.user32.keybd_event(mod_code, 0, 2, 0)
+    except Exception as e:
+        print(f"[Hotkey Error] {e}")
+
 def execute_action(response: str) -> str:
     """Parses ACTION commands and runs them"""
     if response.startswith("ACTION:OPEN:"):
@@ -203,6 +242,52 @@ def execute_action(response: str) -> str:
         query = response.replace("ACTION:SEARCH:", "").strip()
         webbrowser.open(f"https://www.google.com/search?q={query}")
         return f"Ищу {query} в Google"
+
+    elif response.startswith("ACTION:CLOSE_WINDOW"):
+        press_hotkey(0x12, 0x73)  # Alt + F4
+        return "Закрываю окно"
+
+    elif response.startswith("ACTION:MINIMIZE_ALL"):
+        subprocess.Popen("powershell -command \"(New-Object -ComObject shell.application).minimizeall()\"", shell=True)
+        return "Сворачиваю все окна"
+
+    elif response.startswith("ACTION:VOLUME_UP"):
+        for _ in range(5):
+            press_key(0xAF)  # VK_VOLUME_UP
+        return "Делаю громче"
+
+    elif response.startswith("ACTION:VOLUME_DOWN"):
+        for _ in range(5):
+            press_key(0xAE)  # VK_VOLUME_DOWN
+        return "Делаю тише"
+
+    elif response.startswith("ACTION:MUTE"):
+        press_key(0xAD)  # VK_VOLUME_MUTE
+        return "Переключаю звук"
+
+    elif response.startswith("ACTION:SCROLL_DOWN"):
+        press_key(0x22)  # VK_NEXT (Page Down)
+        return "Листаю вниз"
+
+    elif response.startswith("ACTION:SCROLL_UP"):
+        press_key(0x21)  # VK_PRIOR (Page Up)
+        return "Листаю вверх"
+
+    elif response.startswith("ACTION:CLOSE_TAB"):
+        press_hotkey(0x11, 0x57)  # Ctrl + W
+        return "Закрываю вкладку"
+
+    elif response.startswith("ACTION:NEW_TAB"):
+        press_hotkey(0x11, 0x54)  # Ctrl + T
+        return "Открываю новую вкладку"
+
+    elif response.startswith("ACTION:BACK"):
+        press_hotkey(0x12, 0x25)  # Alt + Left
+        return "Возвращаюсь назад"
+
+    elif response.startswith("ACTION:LOCK_SCREEN"):
+        subprocess.Popen("rundll32.exe user32.dll,LockWorkStation", shell=True)
+        return "Блокирую компьютер"
 
     return response
 
