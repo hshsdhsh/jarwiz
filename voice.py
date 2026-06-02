@@ -106,17 +106,20 @@ SYSTEM_PROMPT = """Ты JarWiz — голосовой AI-ассистент на
 3. Говори естественно, как человек
 4. Отвечай на том же языке, на котором говорит пользователь
 
-Когда пользователь просит открыть приложение или сайт — ответь ТОЛЬКО так:
+Когда пользователь просит открыть приложение или сайт — ответь ТОЛЬКО одной строкой:
 ACTION:OPEN:название
 
-Когда просит найти что-то в интернете — ответь ТОЛЬКО так:
+Когда просит найти что-то в интернете — ответь ТОЛЬКО одной строкой:
 ACTION:SEARCH:запрос
 
 Примеры команд:
 - "открой хром" → ACTION:OPEN:chrome
 - "открой ютуб" → ACTION:OPEN:https://youtube.com
 - "найди рецепт борща" → ACTION:SEARCH:рецепт борща
-- "открой калькулятор" → ACTION:OPEN:calc
+- "открой калькулятор" → ACTION:OPEN:calculator
+- "открой vscode" → ACTION:OPEN:vscode
+
+ВАЖНО: Отвечай ТОЛЬКО строкой ACTION:... без лишнего текста, если это команда. Не добавляй пояснений к командам.
 """
 
 history = []
@@ -175,7 +178,9 @@ APP_MAP = {
     "проводник":       "explorer",
     "файлы":           "explorer",
     "vscode":          "code",
-    "код":             "code",
+    "vs code":         "code",
+    "visual studio":   "code",
+    "студия":          "code",
     "spotify":         "spotify",
     "спотифай":        "spotify",
     "discord":         "discord",
@@ -193,6 +198,8 @@ APP_MAP = {
     "google":          "https://google.com",
     "гугл":            "https://google.com",
     "github":          "https://github.com",
+    "telegram":        "telegram",
+    "яндекс м":     "https://disk.yandex.ru",
 }
 
 def execute_action(response: str) -> str:
