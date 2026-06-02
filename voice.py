@@ -48,7 +48,7 @@ VOICE_NAME = "ru-RU-SvetlanaNeural"  # Svetlana (Female Neural Voice)
 tts_lock = threading.Lock()
 
 def speak(text: str):
-    """Speaks text aloud using Edge TTS neural voice (thread-safe)"""
+    """Speaks text aloud using Edge TTS neural voice with emotional SSML styling (thread-safe)"""
     clean = (text
         .replace("**", "").replace("*", "")
         .replace("#", "").replace("`", "")
@@ -59,10 +59,23 @@ def speak(text: str):
         return
     print(f"\n  [JarWiz]: {clean}\n", flush=True)
     
+    # Wrap in emotional SSML (cheerful / friendly style)
+    ssml = f"""
+    <speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='http://www.w3.org/2001/mstts' xml:lang='ru-RU'>
+        <voice name='{VOICE_NAME}'>
+            <mstts:express-as style='cheerful' styledegree='1.1'>
+                <prosody rate='+8%'>
+                    {clean}
+                </prosody>
+            </mstts:express-as>
+        </voice>
+    </speak>
+    """
+    
     async def _async_speak():
         try:
-            # rate="+8%" makes her speak at a slightly faster, more natural, and energetic pace
-            communicate = edge_tts.Communicate(clean, VOICE_NAME, rate="+8%")
+            # Pass SSML directly instead of plain text
+            communicate = edge_tts.Communicate(ssml, VOICE_NAME)
             await communicate.save(TEMP_TTS_FILE)
             
             data, fs = sf.read(TEMP_TTS_FILE)
