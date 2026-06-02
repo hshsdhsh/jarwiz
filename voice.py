@@ -173,6 +173,14 @@ APP_MAP = {
     "github":      "https://github.com",
 }
 
+def clean_speech_target(target: str) -> str:
+    """Helper to clean URL targets into readable names for speech"""
+    if target.startswith("http://") or target.startswith("https://"):
+        domain = target.replace("https://", "").replace("http://", "").replace("www.", "")
+        domain = domain.split("/")[0].split(".")[0]
+        return domain
+    return target
+
 def execute_action(response: str) -> str:
     """Parses ACTION commands and runs them"""
     if response.startswith("ACTION:OPEN:"):
@@ -181,11 +189,13 @@ def execute_action(response: str) -> str:
 
         if url_or_app.startswith("http"):
             webbrowser.open(url_or_app)
-            return f"Открываю {target}"
+            speech_name = clean_speech_target(target)
+            return f"Открываю {speech_name}"
         else:
             try:
                 subprocess.Popen(url_or_app, shell=True)
-                return f"Запускаю {target}"
+                speech_name = clean_speech_target(target)
+                return f"Запускаю {speech_name}"
             except Exception as e:
                 return f"Не могу открыть {target}: {e}"
 
@@ -214,8 +224,8 @@ def record_to_file(filename: str, duration: float, fs: int = 16000, dynamic_sile
             chunk_samples = int(chunk_duration * fs)
             chunks = []
             
-            silence_threshold = 500  # Default threshold for volume
-            silence_limit = 1.0     # Stop after 1 second of silence
+            silence_threshold = 450  # Slightly lower threshold to be more sensitive to speech
+            silence_limit = 1.8     # Stop after 1.8 seconds of silence to prevent premature cutoff
             
             silence_start = None
             start_time = time.time()
