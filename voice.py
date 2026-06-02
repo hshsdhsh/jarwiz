@@ -332,7 +332,7 @@ def main():
 
         if contains_wake_word(text):
             print("  [Wake Word Detected!]")
-            speak("Слушаю вас")
+            speak("Джан")
             
             # Record command (5 seconds)
             print("  [Запись команды...]")
