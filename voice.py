@@ -7,18 +7,23 @@ TTS: pyttsx3 (100% offline)
 AI:  Ollama (local)
 """
 
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 import json
 import os
 import subprocess
-import sys
 import time
 import webbrowser
+import asyncio
 import threading
 import wave
-
 import requests
-import pyttsx3
 import speech_recognition as sr
+import edge_tts
+import soundfile as sf
 import sounddevice as sd
 import numpy as np
 
@@ -35,35 +40,15 @@ LISTEN_LANG = "ru-RU"
 # Temp files
 TEMP_WAKE_FILE = "temp_wake.wav"
 TEMP_CMD_FILE = "temp_cmd.wav"
+TEMP_TTS_FILE = "temp_tts.mp3"
 
 # ─── TTS Engine ───────────────────────────────────────────────────────────────
 
-engine = pyttsx3.init()
-engine.setProperty("rate", 175)      # Speech rate
-engine.setProperty("volume", 1.0)    # Volume 0.0-1.0
-
-# Choose best Russian voice
-voices = engine.getProperty("voices")
-russian_voice = None
-for v in voices:
-    name_lower = (v.name or "").lower()
-    id_lower   = (v.id   or "").lower()
-    if any(x in name_lower or x in id_lower for x in ["russian", "русский", "irina", "pavel", "ru-ru"]):
-        russian_voice = v.id
-        break
-
-if russian_voice:
-    engine.setProperty("voice", russian_voice)
-    print(f"[TTS] Голос: {russian_voice}")
-else:
-    if voices:
-        engine.setProperty("voice", voices[0].id)
-    print(f"[TTS] Русский голос не найден, используем системный")
-
+VOICE_NAME = "ru-RU-DmitryNeural"  # Dmitry (Male Neural Voice)
 tts_lock = threading.Lock()
 
 def speak(text: str):
-    """Speaks text aloud (thread-safe)"""
+    """Speaks text aloud using Edge TTS neural voice (thread-safe)"""
     clean = (text
         .replace("**", "").replace("*", "")
         .replace("#", "").replace("`", "")
@@ -72,10 +57,30 @@ def speak(text: str):
     )
     if not clean:
         return
-    print(f"\n  🔊 JarWiz: {clean}\n")
+    print(f"\n  [JarWiz]: {clean}\n", flush=True)
+    
+    async def _async_speak():
+        try:
+            communicate = edge_tts.Communicate(clean, VOICE_NAME)
+            await communicate.save(TEMP_TTS_FILE)
+            
+            data, fs = sf.read(TEMP_TTS_FILE)
+            sd.play(data, fs)
+            sd.wait()
+        except Exception as e:
+            print(f"[TTS Error] {e}", flush=True)
+        finally:
+            if os.path.exists(TEMP_TTS_FILE):
+                try:
+                    os.remove(TEMP_TTS_FILE)
+                except Exception:
+                    pass
+
     with tts_lock:
-        engine.say(clean)
-        engine.runAndWait()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_async_speak())
+        loop.close()
 
 # ─── System prompt ────────────────────────────────────────────────────────────
 
@@ -234,16 +239,16 @@ def contains_wake_word(text: str) -> bool:
 def main():
     global MODEL
 
-    print("\n" + "=" * 52)
-    print("  JarWiz Voice Assistant (No-PyAudio)")
-    print("=" * 52)
+    print("\n" + "=" * 52, flush=True)
+    print("  JarWiz Voice Assistant (No-PyAudio)", flush=True)
+    print("=" * 52, flush=True)
 
     # Detect model
     MODEL = get_model()
-    print(f"  Модель:    {MODEL}")
-    print(f"  Wake word: jarwiz / джарвиз")
-    print(f"  Язык STT:  {LISTEN_LANG}")
-    print("=" * 52 + "\n")
+    print(f"  Модель:    {MODEL}", flush=True)
+    print(f"  Wake word: jarwiz / джарвиз", flush=True)
+    print(f"  Язык STT:  {LISTEN_LANG}", flush=True)
+    print("=" * 52 + "\n", flush=True)
 
     recognizer = sr.Recognizer()
 
@@ -254,7 +259,7 @@ def main():
         daemon=True,
     ).start()
 
-    print("  Слушаю фоновый шум (ожидание активации)...")
+    print("  Слушаю фоновый шум (ожидание активации)...", flush=True)
     
     while True:
         # Record 2.5 seconds to check for wake word
