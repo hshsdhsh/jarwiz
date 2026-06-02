@@ -157,41 +157,49 @@ def ask_ollama(prompt: str) -> str:
 # ─── PC Actions ───────────────────────────────────────────────────────────────
 
 APP_MAP = {
-    "chrome":      "chrome",
-    "firefox":     "firefox",
-    "edge":        "msedge",
-    "notepad":     "notepad",
-    "блокнот":     "notepad",
-    "calculator":  "calc",
-    "калькулятор": "calc",
-    "explorer":    "explorer",
-    "проводник":   "explorer",
-    "файлы":       "explorer",
-    "vscode":      "code",
-    "код":         "code",
-    "spotify":     "spotify",
-    "спотифай":    "spotify",
-    "discord":     "discord",
-    "дискорд":     "discord",
-    "telegram":    "telegram",
-    "телеграм":    "telegram",
-    "word":        "winword",
-    "excel":       "excel",
-    "powershell":  "powershell",
-    "cmd":         "cmd",
-    "terminal":    "wt",
-    "терминал":    "wt",
-    "youtube":     "https://youtube.com",
-    "ютуб":        "https://youtube.com",
-    "google":      "https://google.com",
-    "гугл":        "https://google.com",
-    "github":      "https://github.com",
+    "chrome":          "chrome",
+    "хром":            "chrome",
+    "гугл хром":       "chrome",
+    "google chrome":   "chrome",
+    "firefox":         "firefox",
+    "edge":            "msedge",
+    "yandex":          "browser",
+    "яндекс":          "https://yandex.ru",
+    "яндекс браузер":  "browser",
+    "yandex browser":  "browser",
+    "notepad":         "notepad",
+    "блокнот":         "notepad",
+    "calculator":      "calc",
+    "калькулятор":     "calc",
+    "explorer":        "explorer",
+    "проводник":       "explorer",
+    "файлы":           "explorer",
+    "vscode":          "code",
+    "код":             "code",
+    "spotify":         "spotify",
+    "спотифай":        "spotify",
+    "discord":         "discord",
+    "дискорд":         "discord",
+    "telegram":        "telegram",
+    "телеграм":        "telegram",
+    "word":            "winword",
+    "excel":           "excel",
+    "powershell":      "powershell",
+    "cmd":             "cmd",
+    "terminal":        "wt",
+    "терминал":        "wt",
+    "youtube":         "https://youtube.com",
+    "ютуб":            "https://youtube.com",
+    "google":          "https://google.com",
+    "гугл":            "https://google.com",
+    "github":          "https://github.com",
 }
 
 def execute_action(response: str) -> str:
     """Parses ACTION commands from response, executes them, and returns clean spoken text"""
-    open_match = re.search(r'ACTION:OPEN:(\S+)', response)
-    search_match = re.search(r'ACTION:SEARCH:(.+)', response)
+    # [^\r\n]+ captures everything until the end of the line, including spaces!
+    open_match = re.search(r'ACTION:OPEN:([^\r\n]+)', response)
+    search_match = re.search(r'ACTION:SEARCH:([^\r\n]+)', response)
     
     clean_text = response
     
@@ -199,17 +207,17 @@ def execute_action(response: str) -> str:
         target = open_match.group(1).strip()
         url_or_app = APP_MAP.get(target.lower(), target)
         
-        # Remove the ACTION statement from what is spoken
-        clean_text = re.sub(r'ACTION:OPEN:\S+', '', clean_text).strip()
+        # Remove the entire ACTION line from what is spoken
+        clean_text = re.sub(r'ACTION:OPEN:[^\r\n]+', '', clean_text).strip()
         
         if url_or_app.startswith("http"):
             webbrowser.open(url_or_app)
             spoken = f"Открываю {target}"
         else:
             try:
-                # Use 'start' to run browser shortcuts safely on Windows
                 cmd = url_or_app
-                if cmd.lower() in ["chrome", "firefox", "msedge"]:
+                # Windows helper: use start for common browsers/apps
+                if cmd.lower() in ["chrome", "firefox", "msedge", "browser"]:
                     cmd = f"start {cmd}"
                 
                 subprocess.Popen(cmd, shell=True)
@@ -221,8 +229,8 @@ def execute_action(response: str) -> str:
 
     elif search_match:
         query = search_match.group(1).strip()
-        # Remove the ACTION statement from what is spoken
-        clean_text = re.sub(r'ACTION:SEARCH:.+', '', clean_text).strip()
+        # Remove the entire ACTION line from what is spoken
+        clean_text = re.sub(r'ACTION:SEARCH:[^\r\n]+', '', clean_text).strip()
         
         webbrowser.open(f"https://www.google.com/search?q={query}")
         spoken = f"Ищу {query} в Google"

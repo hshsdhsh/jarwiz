@@ -142,7 +142,7 @@ function speakText(text) {
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/#{1,6}\s/g, '')
     .replace(/<[^>]+>/g, '')
-    .replace(/ACTION:\w+:\S+/g, '')
+    .replace(/ACTION:\w+:[^\r\n]+/g, '')
     .replace(/https?:\/\/\S+/g, '')
     .trim();
 
