@@ -220,23 +220,78 @@ def press_hotkey(mod_code: int, vk_code: int):
     except Exception as e:
         print(f"[Hotkey Error] {e}")
 
+def find_and_run_app(app_name: str) -> bool:
+    """Dynamically finds and runs an installed application shortcut from the Start Menu"""
+    search_paths = [
+        os.path.join(os.environ.get("APPDATA", ""), "Microsoft\\Windows\\Start Menu\\Programs"),
+        "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs",
+    ]
+    
+    q_words = [w for w in app_name.lower().split() if len(w) > 2]
+    if not q_words:
+        q_words = [app_name.lower()]
+
+    for path in search_paths:
+        if not os.path.exists(path):
+            continue
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                if file.endswith(".lnk"):
+                    shortcut_name = os.path.splitext(file)[0].lower()
+                    
+                    # Fuzzy match words (e.g. match "музыку" or "музыка" or "yandex")
+                    matched = False
+                    for qw in q_words:
+                        qw_root = qw[:-1] if len(qw) > 4 else qw
+                        for sw in shortcut_name.split():
+                            sw_root = sw[:-1] if len(sw) > 4 else sw
+                            if qw_root in sw_root or sw_root in qw_root:
+                                matched = True
+                                break
+                        if matched:
+                            break
+                            
+                    if matched or app_name.lower() in shortcut_name or shortcut_name in app_name.lower():
+                        shortcut_path = os.path.join(root, file)
+                        try:
+                            os.startfile(shortcut_path)
+                            return True
+                        except Exception as e:
+                            print(f"[Launcher] Ошибка запуска ярлыка {file}: {e}")
+    return False
+
 def execute_action(response: str) -> str:
     """Parses ACTION commands and runs them"""
     if response.startswith("ACTION:OPEN:"):
         target = response.replace("ACTION:OPEN:", "").strip()
-        url_or_app = APP_MAP.get(target.lower(), target)
-
-        if url_or_app.startswith("http"):
-            webbrowser.open(url_or_app)
-            speech_name = clean_speech_target(target)
-            return f"Открываю {speech_name}"
-        else:
-            try:
-                subprocess.Popen(url_or_app, shell=True)
+        
+        # 1. Try predefined maps (Chrome, Edge, calc, etc.)
+        url_or_app = APP_MAP.get(target.lower())
+        if url_or_app:
+            if url_or_app.startswith("http"):
+                webbrowser.open(url_or_app)
                 speech_name = clean_speech_target(target)
-                return f"Запускаю {speech_name}"
-            except Exception as e:
-                return f"Не могу открыть {target}: {e}"
+                return f"Открываю {speech_name}"
+            else:
+                try:
+                    subprocess.Popen(url_or_app, shell=True)
+                    speech_name = clean_speech_target(target)
+                    return f"Запускаю {speech_name}"
+                except Exception:
+                    pass
+
+        # 2. Try to search Start Menu dynamically (e.g. for Yandex Music)
+        if find_and_run_app(target):
+            speech_name = clean_speech_target(target)
+            return f"Запускаю {speech_name}"
+
+        # 3. Last resort: try direct execution via shell (if target is a raw cmd like 'notepad')
+        try:
+            subprocess.Popen(target, shell=True)
+            speech_name = clean_speech_target(target)
+            return f"Запускаю {speech_name}"
+        except Exception as e:
+            return f"Не удалось открыть {target}"
 
     elif response.startswith("ACTION:SEARCH:"):
         query = response.replace("ACTION:SEARCH:", "").strip()
