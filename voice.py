@@ -26,6 +26,7 @@ import edge_tts
 import soundfile as sf
 import sounddevice as sd
 import numpy as np
+import re
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -142,15 +143,16 @@ def ask_ollama(prompt: str) -> str:
         r = requests.post(
             f"{OLLAMA_URL}/api/chat",
             json={"model": MODEL, "messages": messages, "stream": False},
-            timeout=90,
+            timeout=15, # Faster timeout for smoother experience
         )
         response = r.json()["message"]["content"].strip()
         history.append({"role": "assistant", "content": response})
         return response
     except requests.exceptions.ConnectionError:
-        return "Ollama не запущен. Запусти Ollama и попробуй снова."
+        return "Не удалось связаться с Оллама. Пожалуйста, запустите приложение Ollama."
     except Exception as e:
-        return f"Ошибка: {str(e)}"
+        print(f"[Ollama Error] {e}", flush=True)
+        return "Произошла ошибка при обработке запроса. Пожалуйста, повторите попытку."
 
 # ─── PC Actions ───────────────────────────────────────────────────────────────
 
@@ -187,25 +189,45 @@ APP_MAP = {
 }
 
 def execute_action(response: str) -> str:
-    """Parses ACTION commands and runs them"""
-    if response.startswith("ACTION:OPEN:"):
-        target = response.replace("ACTION:OPEN:", "").strip()
+    """Parses ACTION commands from response, executes them, and returns clean spoken text"""
+    open_match = re.search(r'ACTION:OPEN:(\S+)', response)
+    search_match = re.search(r'ACTION:SEARCH:(.+)', response)
+    
+    clean_text = response
+    
+    if open_match:
+        target = open_match.group(1).strip()
         url_or_app = APP_MAP.get(target.lower(), target)
-
+        
+        # Remove the ACTION statement from what is spoken
+        clean_text = re.sub(r'ACTION:OPEN:\S+', '', clean_text).strip()
+        
         if url_or_app.startswith("http"):
             webbrowser.open(url_or_app)
-            return f"Открываю {target}"
+            spoken = f"Открываю {target}"
         else:
             try:
-                subprocess.Popen(url_or_app, shell=True)
-                return f"Запускаю {target}"
+                # Use 'start' to run browser shortcuts safely on Windows
+                cmd = url_or_app
+                if cmd.lower() in ["chrome", "firefox", "msedge"]:
+                    cmd = f"start {cmd}"
+                
+                subprocess.Popen(cmd, shell=True)
+                spoken = f"Запускаю {target}"
             except Exception as e:
-                return f"Не могу открыть {target}: {e}"
+                spoken = f"Не могу открыть {target}"
+        
+        return clean_text if clean_text else spoken
 
-    elif response.startswith("ACTION:SEARCH:"):
-        query = response.replace("ACTION:SEARCH:", "").strip()
+    elif search_match:
+        query = search_match.group(1).strip()
+        # Remove the ACTION statement from what is spoken
+        clean_text = re.sub(r'ACTION:SEARCH:.+', '', clean_text).strip()
+        
         webbrowser.open(f"https://www.google.com/search?q={query}")
-        return f"Ищу {query} в Google"
+        spoken = f"Ищу {query} в Google"
+        
+        return clean_text if clean_text else spoken
 
     return response
 
