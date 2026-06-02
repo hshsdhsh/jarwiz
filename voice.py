@@ -497,6 +497,13 @@ def main():
             if any(cw in command for cw in cancel_words):
                 speak("Поняла, отменяю")
                 continue
+
+            # Команда полного закрытия (Shutdown assistant command)
+            shutdown_words = ["закройся", "выключись", "отключись", "выключить джарвиса", "выключить джарвиз", "стоп джарвиз"]
+            if any(sw in command for sw in shutdown_words):
+                speak("Отключаюсь, до свидания")
+                time.sleep(1.5)
+                sys.exit(0)
             
             # Ask Ollama
             print("  Думаю...")
