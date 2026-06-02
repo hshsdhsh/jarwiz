@@ -44,7 +44,7 @@ TEMP_TTS_FILE = "temp_tts.mp3"
 
 # ─── TTS Engine ───────────────────────────────────────────────────────────────
 
-VOICE_NAME = "ru-RU-DmitryNeural"  # Dmitry (Male Neural Voice)
+VOICE_NAME = "ru-RU-SvetlanaNeural"  # Svetlana (Female Neural Voice)
 tts_lock = threading.Lock()
 
 def speak(text: str):
@@ -61,7 +61,8 @@ def speak(text: str):
     
     async def _async_speak():
         try:
-            communicate = edge_tts.Communicate(clean, VOICE_NAME)
+            # rate="+8%" makes her speak at a slightly faster, more natural, and energetic pace
+            communicate = edge_tts.Communicate(clean, VOICE_NAME, rate="+8%")
             await communicate.save(TEMP_TTS_FILE)
             
             data, fs = sf.read(TEMP_TTS_FILE)
@@ -299,6 +300,12 @@ def main():
                 continue
 
             print(f"  Ты: {command}")
+
+            # Слово отмены (Cancellation words)
+            cancel_words = ["отмена", "стоп", "отставить", "забудь", "отменяй", "отменяем", "хватит", "молчи"]
+            if any(cw in command for cw in cancel_words):
+                speak("Поняла, отменяю")
+                continue
             
             # Ask Ollama
             print("  Думаю...")
