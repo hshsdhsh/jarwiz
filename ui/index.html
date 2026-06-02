@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JarWiz — Local AI Assistant</title>
+  <meta name="description" content="JarWiz: Your local AI assistant powered by Ollama. Privacy-first, offline-ready." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── Animated background ── -->
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 40 40" fill="none">
+          <circle cx="20" cy="20" r="18" stroke="url(#grad1)" stroke-width="2"/>
+          <path d="M12 20 L20 12 L28 20 L20 28 Z" fill="url(#grad1)" opacity="0.8"/>
+          <circle cx="20" cy="20" r="4" fill="white"/>
+          <defs>
+            <linearGradient id="grad1" x1="0" y1="0" x2="40" y2="40">
+              <stop offset="0%" stop-color="#6366f1"/>
+              <stop offset="100%" stop-color="#a855f7"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div>
+        <span class="logo-text">JarWiz</span>
+        <span class="logo-sub">Local AI</span>
+      </div>
+    </div>
+    <button class="btn-icon" id="newChatBtn" title="New Chat">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Status -->
+  <div class="status-card" id="statusCard">
+    <div class="status-dot" id="statusDot"></div>
+    <div class="status-info">
+      <span id="statusText">Проверка...</span>
+      <span id="statusSub" class="status-sub"></span>
+    </div>
+  </div>
+
+  <!-- Model selector -->
+  <div class="model-section">
+    <label class="section-label">Модель</label>
+    <div class="model-select-wrap">
+      <select id="modelSelect" class="model-select">
+        <option value="">Загрузка...</option>
+      </select>
+      <svg class="select-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 9l6 6 6-6"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="quick-section">
+    <label class="section-label">Быстрые действия</label>
+    <div class="quick-actions">
+      <button class="quick-btn" onclick="quickAction('open', 'chrome')" id="qa-chrome">
+        <span class="qa-icon">🌐</span> Chrome
+      </button>
+      <button class="quick-btn" onclick="quickAction('open', 'code')" id="qa-vscode">
+        <span class="qa-icon">💻</span> VS Code
+      </button>
+      <button class="quick-btn" onclick="quickAction('open', 'notepad')" id="qa-notepad">
+        <span class="qa-icon">📝</span> Notepad
+      </button>
+      <button class="quick-btn" onclick="quickAction('open', 'calc')" id="qa-calc">
+        <span class="qa-icon">🧮</span> Calc
+      </button>
+      <button class="quick-btn" onclick="quickAction('open', 'spotify')" id="qa-spotify">
+        <span class="qa-icon">🎵</span> Spotify
+      </button>
+      <button class="quick-btn" onclick="quickAction('open', 'explorer')" id="qa-files">
+        <span class="qa-icon">📁</span> Files
+      </button>
+    </div>
+  </div>
+
+  <!-- Time -->
+  <div class="sidebar-footer">
+    <div class="time-display" id="timeDisplay">00:00</div>
+    <div class="date-display" id="dateDisplay"></div>
+    <button class="clear-btn" id="clearBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+      </svg>
+      Очистить историю
+    </button>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<main class="main">
+
+  <!-- Header -->
+  <header class="chat-header">
+    <div class="header-left">
+      <h1 class="header-title">Чат с AI</h1>
+      <div class="header-badge" id="modelBadge">Ollama</div>
+    </div>
+    <div class="header-right">
+      <div class="voice-indicator" id="voiceIndicator" title="Голосовой ввод">
+        <div class="voice-waves">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Messages -->
+  <div class="messages-wrap" id="messagesWrap">
+    <div class="messages" id="messages">
+      <!-- Welcome screen -->
+      <div class="welcome" id="welcomeScreen">
+        <div class="welcome-icon">
+          <svg viewBox="0 0 80 80" fill="none" width="80" height="80">
+            <circle cx="40" cy="40" r="36" stroke="url(#wg)" stroke-width="2" stroke-dasharray="4 2"/>
+            <path d="M24 40 L40 24 L56 40 L40 56 Z" fill="url(#wg)" opacity="0.6"/>
+            <circle cx="40" cy="40" r="8" fill="white" opacity="0.9"/>
+            <defs>
+              <linearGradient id="wg" x1="0" y1="0" x2="80" y2="80">
+                <stop offset="0%" stop-color="#6366f1"/>
+                <stop offset="100%" stop-color="#a855f7"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <h2 class="welcome-title">Привет, я JarWiz</h2>
+        <p class="welcome-sub">Твой локальный AI-ассистент без интернета.<br/>Спроси меня о чём угодно.</p>
+        <div class="welcome-chips">
+          <button class="chip" onclick="sendSuggestion('Напиши простой Python скрипт для сортировки списка')">🐍 Python код</button>
+          <button class="chip" onclick="sendSuggestion('Объясни как работает нейросеть простыми словами')">🧠 Как работает AI?</button>
+          <button class="chip" onclick="sendSuggestion('Открой Chrome')">🌐 Открой Chrome</button>
+          <button class="chip" onclick="sendSuggestion('Придумай идею для стартапа')">💡 Идея стартапа</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <div class="input-container" id="inputContainer">
+      <button class="input-btn" id="voiceBtn" title="Голосовой ввод">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="2" width="6" height="13" rx="3"/>
+          <path d="M5 10a7 7 0 0014 0M12 19v3M8 22h8"/>
+        </svg>
+      </button>
+      <textarea
+        id="messageInput"
+        class="message-input"
+        placeholder="Напиши сообщение... (Enter отправить, Shift+Enter новая строка)"
+        rows="1"
+      ></textarea>
+      <button class="send-btn" id="sendBtn" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
+        </svg>
+      </button>
+    </div>
+    <div class="input-hint">JarWiz работает локально · Без интернета · Данные на твоём ПК</div>
+  </div>
+
+</main>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
