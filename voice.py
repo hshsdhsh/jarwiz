@@ -26,12 +26,11 @@ import edge_tts
 import soundfile as sf
 import sounddevice as sd
 import numpy as np
-import re
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 OLLAMA_URL = "http://localhost:11434"
-MODEL      = "mistral"          # Change if using another model
+MODEL      = "qwen2.5:3b"       # Fast 3B model — instant responses!
 WAKE_WORDS = [
     "jarwiz", "jarvis", "джарвиз", "жарвиз",
     "джарвис", "жарвис", "джервиз", "джервис",
@@ -49,7 +48,7 @@ VOICE_NAME = "ru-RU-SvetlanaNeural"  # Svetlana (Female Neural Voice)
 tts_lock = threading.Lock()
 
 def speak(text: str):
-    """Speaks text aloud using Edge TTS neural voice with emotional SSML styling (thread-safe)"""
+    """Speaks text aloud using Edge TTS neural voice (thread-safe)"""
     clean = (text
         .replace("**", "").replace("*", "")
         .replace("#", "").replace("`", "")
@@ -60,23 +59,10 @@ def speak(text: str):
         return
     print(f"\n  [JarWiz]: {clean}\n", flush=True)
     
-    # Wrap in emotional SSML (cheerful / friendly style)
-    ssml = f"""
-    <speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='http://www.w3.org/2001/mstts' xml:lang='ru-RU'>
-        <voice name='{VOICE_NAME}'>
-            <mstts:express-as style='cheerful' styledegree='1.1'>
-                <prosody rate='+8%'>
-                    {clean}
-                </prosody>
-            </mstts:express-as>
-        </voice>
-    </speak>
-    """
-    
     async def _async_speak():
         try:
-            # Pass SSML directly instead of plain text
-            communicate = edge_tts.Communicate(ssml, VOICE_NAME)
+            # rate="+8%" makes her speak at a slightly faster, more natural, and energetic pace
+            communicate = edge_tts.Communicate(clean, VOICE_NAME, rate="+8%")
             await communicate.save(TEMP_TTS_FILE)
             
             data, fs = sf.read(TEMP_TTS_FILE)
@@ -106,20 +92,17 @@ SYSTEM_PROMPT = """Ты JarWiz — голосовой AI-ассистент на
 3. Говори естественно, как человек
 4. Отвечай на том же языке, на котором говорит пользователь
 
-Когда пользователь просит открыть приложение или сайт — ответь ТОЛЬКО одной строкой:
+Когда пользователь просит открыть приложение или сайт — ответь ТОЛЬКО так:
 ACTION:OPEN:название
 
-Когда просит найти что-то в интернете — ответь ТОЛЬКО одной строкой:
+Когда просит найти что-то в интернете — ответь ТОЛЬКО так:
 ACTION:SEARCH:запрос
 
 Примеры команд:
 - "открой хром" → ACTION:OPEN:chrome
 - "открой ютуб" → ACTION:OPEN:https://youtube.com
 - "найди рецепт борща" → ACTION:SEARCH:рецепт борща
-- "открой калькулятор" → ACTION:OPEN:calculator
-- "открой vscode" → ACTION:OPEN:vscode
-
-ВАЖНО: Отвечай ТОЛЬКО строкой ACTION:... без лишнего текста, если это команда. Не добавляй пояснений к командам.
+- "открой калькулятор" → ACTION:OPEN:calc
 """
 
 history = []
@@ -146,103 +129,70 @@ def ask_ollama(prompt: str) -> str:
         r = requests.post(
             f"{OLLAMA_URL}/api/chat",
             json={"model": MODEL, "messages": messages, "stream": False},
-            timeout=15, # Faster timeout for smoother experience
+            timeout=90,
         )
         response = r.json()["message"]["content"].strip()
         history.append({"role": "assistant", "content": response})
         return response
     except requests.exceptions.ConnectionError:
-        return "Не удалось связаться с Оллама. Пожалуйста, запустите приложение Ollama."
+        return "Ollama не запущен. Запусти Ollama и попробуй снова."
     except Exception as e:
-        print(f"[Ollama Error] {e}", flush=True)
-        return "Произошла ошибка при обработке запроса. Пожалуйста, повторите попытку."
+        return f"Ошибка: {str(e)}"
 
 # ─── PC Actions ───────────────────────────────────────────────────────────────
 
 APP_MAP = {
-    "chrome":          "chrome",
-    "хром":            "chrome",
-    "гугл хром":       "chrome",
-    "google chrome":   "chrome",
-    "firefox":         "firefox",
-    "edge":            "msedge",
-    "yandex":          "browser",
-    "яндекс":          "https://yandex.ru",
-    "яндекс браузер":  "browser",
-    "yandex browser":  "browser",
-    "notepad":         "notepad",
-    "блокнот":         "notepad",
-    "calculator":      "calc",
-    "калькулятор":     "calc",
-    "explorer":        "explorer",
-    "проводник":       "explorer",
-    "файлы":           "explorer",
-    "vscode":          "code",
-    "vs code":         "code",
-    "visual studio":   "code",
-    "студия":          "code",
-    "spotify":         "spotify",
-    "спотифай":        "spotify",
-    "discord":         "discord",
-    "дискорд":         "discord",
-    "telegram":        "telegram",
-    "телеграм":        "telegram",
-    "word":            "winword",
-    "excel":           "excel",
-    "powershell":      "powershell",
-    "cmd":             "cmd",
-    "terminal":        "wt",
-    "терминал":        "wt",
-    "youtube":         "https://youtube.com",
-    "ютуб":            "https://youtube.com",
-    "google":          "https://google.com",
-    "гугл":            "https://google.com",
-    "github":          "https://github.com",
-    "telegram":        "telegram",
-    "яндекс м":     "https://disk.yandex.ru",
+    "chrome":      "chrome",
+    "firefox":     "firefox",
+    "edge":        "msedge",
+    "notepad":     "notepad",
+    "блокнот":     "notepad",
+    "calculator":  "calc",
+    "калькулятор": "calc",
+    "explorer":    "explorer",
+    "проводник":   "explorer",
+    "файлы":       "explorer",
+    "vscode":      "code",
+    "код":         "code",
+    "spotify":     "spotify",
+    "спотифай":    "spotify",
+    "discord":     "discord",
+    "дискорд":     "discord",
+    "telegram":    "telegram",
+    "телеграм":    "telegram",
+    "word":        "winword",
+    "excel":       "excel",
+    "powershell":  "powershell",
+    "cmd":         "cmd",
+    "terminal":    "wt",
+    "терминал":    "wt",
+    "youtube":     "https://youtube.com",
+    "ютуб":        "https://youtube.com",
+    "google":      "https://google.com",
+    "гугл":        "https://google.com",
+    "github":      "https://github.com",
 }
 
 def execute_action(response: str) -> str:
-    """Parses ACTION commands from response, executes them, and returns clean spoken text"""
-    # [^\r\n]+ captures everything until the end of the line, including spaces!
-    open_match = re.search(r'ACTION:OPEN:([^\r\n]+)', response)
-    search_match = re.search(r'ACTION:SEARCH:([^\r\n]+)', response)
-    
-    clean_text = response
-    
-    if open_match:
-        target = open_match.group(1).strip()
+    """Parses ACTION commands and runs them"""
+    if response.startswith("ACTION:OPEN:"):
+        target = response.replace("ACTION:OPEN:", "").strip()
         url_or_app = APP_MAP.get(target.lower(), target)
-        
-        # Remove the entire ACTION line from what is spoken
-        clean_text = re.sub(r'ACTION:OPEN:[^\r\n]+', '', clean_text).strip()
-        
+
         if url_or_app.startswith("http"):
             webbrowser.open(url_or_app)
-            spoken = f"Открываю {target}"
+            return f"Открываю {target}"
         else:
             try:
-                cmd = url_or_app
-                # Windows helper: use start for common browsers/apps
-                if cmd.lower() in ["chrome", "firefox", "msedge", "browser"]:
-                    cmd = f"start {cmd}"
-                
-                subprocess.Popen(cmd, shell=True)
-                spoken = f"Запускаю {target}"
+                subprocess.Popen(url_or_app, shell=True)
+                return f"Запускаю {target}"
             except Exception as e:
-                spoken = f"Не могу открыть {target}"
-        
-        return clean_text if clean_text else spoken
+                return f"Не могу открыть {target}: {e}"
 
-    elif search_match:
-        query = search_match.group(1).strip()
-        # Remove the entire ACTION line from what is spoken
-        clean_text = re.sub(r'ACTION:SEARCH:[^\r\n]+', '', clean_text).strip()
-        
+    elif response.startswith("ACTION:SEARCH:"):
+        query = response.replace("ACTION:SEARCH:", "").strip()
         webbrowser.open(f"https://www.google.com/search?q={query}")
-        spoken = f"Ищу {query} в Google"
-        
-        return clean_text if clean_text else spoken
+        return f"Ищу {query} в Google"
 
     return response
 
